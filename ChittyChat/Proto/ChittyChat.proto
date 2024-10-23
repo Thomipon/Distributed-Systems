@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+// What is this stuff exactly?
+option go_package = "chittychat.org/chittychatproto";
+option java_multiple_files = true;
+option java_package = "io.grpc.examples.helloworld";
+option java_outer_classname = "HelloWorldProto";
+
+package chittychatproto;
+
+service ChittyChatService {
+  rpc EnterChat (stream MessageRequest) returns (stream MessageReply) {}
+}
+
+// The request message containing the user's name.
+message MessageRequest {
+  string name = 1;
+}
+
+// The response message containing the greetings
+message MessageReply {
+  string message = 1;
+}
