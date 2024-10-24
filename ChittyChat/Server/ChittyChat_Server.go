@@ -7,6 +7,7 @@ import (
 	"net"
 	"sync"
 
+	"main/clock"
 	pb "main/proto"
 
 	"google.golang.org/grpc"
@@ -18,6 +19,7 @@ type server struct {
 	pb.UnimplementedChittyChatServiceServer
 	clients map[string]message_stream
 	mutex   sync.Mutex // This could be split into read/write locks or by resource but this should suffice for our case
+	clock   clock.LamportClock
 }
 
 type message_error struct {
@@ -32,10 +34,10 @@ var (
 	port = flag.Int("port", 50051, "The server port")
 )
 
-func broadcast_internal(s *server, message string) {
-	log.Println(message)
+func broadcast_internal(s *server, message string, time uint64) {
+	log.Printf("Broadcasting message \"%s\" at time %d\n", message, time)
 	for _, stream := range s.clients { // TODO: maybe filter out sender of the message
-		stream.Send(&pb.MessageReply{Message: message})
+		stream.Send(&pb.MessageReply{Message: message, Time: time})
 	}
 }
 
@@ -47,21 +49,23 @@ func register_client(s *server, name string, stream message_stream) bool {
 		return false
 	}
 	s.clients[name] = stream
-	broadcast_internal(s, fmt.Sprintf("Participant %s joined Chitty-Chat at Lamport time L", name)) // TODO: timestamp
+	time := s.clock.Tick()
+	broadcast_internal(s, fmt.Sprintf("Participant %s joined Chitty-Chat at Lamport time %d", name, time), time)
 	return true
 }
 
 func deregister_client(s *server, name string) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	broadcast_internal(s, fmt.Sprintf("Participant %s left Chitty-Chat at Lamport time L", name)) // TODO: timestamp
+	time := s.clock.Tick()
+	broadcast_internal(s, fmt.Sprintf("Participant %s left Chitty-Chat at Lamport time %d", name, time), time)
 	delete(s.clients, name)
 }
 
-func broadcast(s *server, message string) {
+func broadcast(s *server, message string, time uint64) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	broadcast_internal(s, message)
+	broadcast_internal(s, message, time)
 }
 
 func (s *server) EnterChat(stream message_stream) error {
@@ -81,7 +85,8 @@ func (s *server) EnterChat(stream message_stream) error {
 			break
 		}
 		final_message := fmt.Sprintf("%s: %s", name, msg.GetMessage())
-		broadcast(s, final_message)
+		time := s.clock.Advance(msg.GetTime())
+		broadcast(s, final_message, time)
 	}
 	return nil
 }

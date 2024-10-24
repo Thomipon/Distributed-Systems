@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	clock "main/Clock"
 	pb "main/proto"
 
 	"google.golang.org/grpc"
@@ -26,7 +27,7 @@ func read(reader *bufio.Reader) string {
 	return strings.Replace(text, "\n", "", -1)
 }
 
-func send(stream message_stream) {
+func send(stream message_stream, clock *clock.LamportClock) {
 	reader := bufio.NewReader(os.Stdin)
 
 	name_entered := false
@@ -48,7 +49,8 @@ func send(stream message_stream) {
 			log.Printf("Unknown command: %s", text)
 			continue
 		}
-		err := stream.Send(&pb.MessageRequest{Message: text})
+		time := clock.Tick()
+		err := stream.Send(&pb.MessageRequest{Message: text, Time: time})
 		if err != nil {
 			log.Fatalf("Error occurred while sending: %v", err)
 			continue
@@ -58,14 +60,15 @@ func send(stream message_stream) {
 
 }
 
-func receive(stream message_stream) {
+func receive(stream message_stream, clock *clock.LamportClock) {
 	for {
 		msg, err := stream.Recv()
 		if err != nil {
 			log.Fatalf("Error occurred while receiving: %v", err)
 			continue // TODO: This might be the wrong behaviour here; it seems to cause errors when exiting normally
 		}
-		log.Println(msg)
+		time := clock.Advance(msg.GetTime())
+		log.Printf("Received \"%s\" at time %d\n", msg.GetMessage(), time)
 	}
 
 }
@@ -87,6 +90,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to enter chat with error: %v", err)
 	}
-	go receive(stream) // TODO: This probably wants to be somewhere else. We should probably only receive messages when we are logged in with our name
-	send(stream)
+	clock := clock.LamportClock{}
+	go receive(stream, &clock) // TODO: This probably wants to be somewhere else. We should probably only receive messages when we are logged in with our name
+	send(stream, &clock)
 }
