@@ -14,7 +14,7 @@ service ChittyChatService {
 
 // The request message containing the user's name.
 message MessageRequest {
-  string name = 1;
+  string message = 1;
 }
 
 // The response message containing the greetings
