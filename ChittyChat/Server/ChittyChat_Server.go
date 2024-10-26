@@ -36,7 +36,7 @@ var (
 
 func broadcast_internal(s *server, message string, time uint64) {
 	log.Printf("Broadcasting message \"%s\" at time %d\n", message, time)
-	for _, stream := range s.clients { // TODO: maybe filter out sender of the message
+	for _, stream := range s.clients {
 		stream.Send(&pb.MessageReply{Message: message, Time: time})
 	}
 }
