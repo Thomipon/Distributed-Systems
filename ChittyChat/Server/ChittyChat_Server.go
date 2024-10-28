@@ -73,6 +73,7 @@ func (s *server) EnterChat(stream message_stream) error {
 	if err != nil {
 		return err
 	}
+	s.clock.Advance(msg.GetTime())
 	name := msg.GetMessage() // first message is the requested name
 	if !register_client(s, name, stream) {
 		log.Println("Someone tried to log in as %s but this name is already taken by another user!", name)
@@ -85,7 +86,8 @@ func (s *server) EnterChat(stream message_stream) error {
 			break
 		}
 		final_message := fmt.Sprintf("%s: %s", name, msg.GetMessage())
-		time := s.clock.Advance(msg.GetTime())
+		s.clock.Advance(msg.GetTime()) // receive
+		time := s.clock.Tick()         // send
 		broadcast(s, final_message, time)
 	}
 	return nil
